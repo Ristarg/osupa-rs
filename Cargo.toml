@@ -1,0 +1,8 @@
+[package]
+name = "osupa-rs"
+version = "0.1.0"
+authors = ["Ristarg <a.filippov@protonmail.com>"]
+
+[dependencies]
+byteorder = "1"
+leb128 = "0.2.3"
