@@ -1,6 +1,3 @@
-#![feature(test)]
-
-extern crate test;
 extern crate byteorder;
 extern crate leb128;
 
@@ -12,40 +9,25 @@ use std::{
 use byteorder::{LE, ReadBytesExt};
 
 fn main() {
-    println!("Cwd: {:?}", env::current_dir().unwrap());
-
+    let args: Vec<String> = env::args().collect();
     let mut buffer = vec![];
 
-    let mut file = fs::File::open("osu!.db").unwrap();
+    //FIXME: bounds check
+    let mut file = fs::File::open(&args[1]).unwrap();
     file.read_to_end(&mut buffer).unwrap();
-
-    // println!("{:?}\n", &buffer[..100]);
 
     let db = OsuDb::parse(&buffer[..]);
     let mut writer = BufWriter::new(fs::File::create("parsed_db.txt").unwrap());
-    write!(&mut writer, "{:#?}", db);
-
-    println!("Done!")
+    write!(&mut writer, "{:#?}", db).unwrap();
 }
 
-#[bench]
-fn bench_parser(b: &mut test::Bencher) {
-    b.iter(|| {
-        let mut buffer = vec![];
-
-        let mut file = std::fs::File::open("skoll_osu.db").unwrap();
-        file.read_to_end(&mut buffer).unwrap();
-
-        let db = OsuDb::parse(&buffer[..]);
-    })
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct OsuDb {
     version: u32,
     folder_count: u32,
     account_unlocked: bool,
-    date_unlocked: u64, // DateTime isn't described in the spec, it's 8 bytes so I assume it's a unix timestamp
+    date_unlocked: u64, // DateTime type isn't explained in the spec
+                        // it's 8 bytes so I assume it's a unix timestamp
     player_name: String,
     beatmaps: Vec<Beatmap>,
     unknown_int: u32
@@ -93,12 +75,16 @@ trait ReadOsuDbExt : ReadBytesExt {
     }
 
     fn read_osu_int_double_pair(&mut self) -> IntDoublePair {
-        let mut pair = IntDoublePair::default();
-        assert_eq!(self.read_osu_byte(), 0x08);
-        pair.0 = self.read_osu_int();
-        assert_eq!(self.read_osu_byte(), 0x0d);
-        pair.1 = self.read_osu_double();
-        pair
+        IntDoublePair(
+            {
+                assert_eq!(self.read_osu_byte(), 0x08);
+                self.read_osu_int()
+            },
+            {
+                assert_eq!(self.read_osu_byte(), 0x0d);
+                self.read_osu_double()
+            }
+        )
     }
 
     fn read_osu_timing_point(&mut self) -> TimingPoint {
@@ -115,16 +101,15 @@ impl<R: ReadBytesExt + ?Sized> ReadOsuDbExt for R {}
 impl OsuDb {
     fn parse(buf: &[u8]) -> Self {
         let mut rdr = Cursor::new(buf);
-        let db = OsuDb {
+        OsuDb {
             version: rdr.read_osu_int(),
             folder_count: rdr.read_osu_int(),
-            account_unlocked: rdr.read_osu_boolean(),
-            date_unlocked: rdr.read_osu_long(), //TODO: combine into an Option-like enum?
+            account_unlocked: rdr.read_osu_boolean(), //
+            date_unlocked: rdr.read_osu_long(),       //TODO: combine into an Option-like enum?
             player_name: rdr.read_osu_string(),
             beatmaps: OsuDb::parse_beatmaps(&mut rdr),
             unknown_int: rdr.read_osu_int()
-        };
-        db
+        }
     }
 
     fn parse_beatmaps(rdr: &mut Cursor<&[u8]>) -> Vec<Beatmap> {
@@ -166,7 +151,7 @@ impl OsuDb {
                         points.push(rdr.read_osu_timing_point())
                     }
                     points
-                }, //FIXME: this doesn't seem right, but the byte length matches alright
+                }, //FIXME: this doesn't seem right, but the byte length matches alright, also code duplication
                 beatmap_id: rdr.read_osu_int(),
                 beatmap_set_id: rdr.read_osu_int(),
                 thread_id: rdr.read_osu_int(),
@@ -208,7 +193,7 @@ impl OsuDb {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Beatmap {
     size_in_bytes: u32,
     artist_name: String,
@@ -267,7 +252,6 @@ struct Beatmap {
 }
 
 #[derive(Debug)]
-#[repr(u8)]
 enum RankedStatus {
     Ranked = 4,
     Approved = 5,
@@ -293,7 +277,6 @@ impl Default for RankedStatus {
 }
 
 #[derive(Debug)]
-#[repr(u8)]
 enum GameplayMode {
     Standard = 0,
     Taiko = 1,
@@ -320,7 +303,7 @@ impl Default for GameplayMode {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct IntDoublePair(u32, f64);
 
 #[derive(Debug)]
