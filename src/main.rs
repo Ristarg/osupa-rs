@@ -4,12 +4,15 @@ extern crate test;
 extern crate byteorder;
 extern crate leb128;
 
-use std::io::{Read, Write, Cursor, BufWriter};
-use std::fs;
+use std::{
+    env,
+    fs,
+    io::{Read, Write, Cursor, BufWriter}
+};
 use byteorder::{LE, ReadBytesExt};
 
 fn main() {
-    println!("Cwd: {:?}", std::env::current_dir().unwrap());
+    println!("Cwd: {:?}", env::current_dir().unwrap());
 
     let mut buffer = vec![];
 
@@ -44,7 +47,6 @@ struct OsuDb {
     account_unlocked: bool,
     date_unlocked: u64, // DateTime isn't described in the spec, it's 8 bytes so I assume it's a unix timestamp
     player_name: String,
-    number_of_beatmaps: u32,
     beatmaps: Vec<Beatmap>,
     unknown_int: u32
 }
@@ -113,24 +115,20 @@ impl<R: ReadBytesExt + ?Sized> ReadOsuDbExt for R {}
 impl OsuDb {
     fn parse(buf: &[u8]) -> Self {
         let mut rdr = Cursor::new(buf);
-        let n;
         let db = OsuDb {
             version: rdr.read_osu_int(),
             folder_count: rdr.read_osu_int(),
             account_unlocked: rdr.read_osu_boolean(),
             date_unlocked: rdr.read_osu_long(), //TODO: combine into an Option-like enum?
             player_name: rdr.read_osu_string(),
-            number_of_beatmaps: {
-                n = rdr.read_osu_int(); //FIXME: num of maps is an implem detail, can be local to parse_beatmaps
-                n
-            },
-            beatmaps: OsuDb::parse_beatmaps(n, &mut rdr),
+            beatmaps: OsuDb::parse_beatmaps(&mut rdr),
             unknown_int: rdr.read_osu_int()
         };
         db
     }
 
-    fn parse_beatmaps(number_of_beatmaps: u32, rdr: &mut Cursor<&[u8]>) -> Vec<Beatmap> {
+    fn parse_beatmaps(rdr: &mut Cursor<&[u8]>) -> Vec<Beatmap> {
+        let number_of_beatmaps = rdr.read_osu_int();
         let mut beatmaps = Vec::with_capacity(number_of_beatmaps as usize);
         for _ in 0..number_of_beatmaps {
             beatmaps.push(Beatmap { // TODO: parallelize
