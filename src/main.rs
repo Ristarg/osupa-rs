@@ -18,7 +18,14 @@ fn main() {
 
     let db = OsuDb::parse(&buffer[..]);
     let mut writer = BufWriter::new(fs::File::create("parsed_db.txt").unwrap());
-    write!(&mut writer, "{:#?}", db).unwrap();
+    let ids = db.beatmaps.into_iter()
+        .filter_map(|bm| match bm.beatmap_id {
+            0 => None,
+            _ => Some(bm.beatmap_id)
+        })
+        .collect::<Vec<u32>>();
+    write!(&mut writer, "{:#?}", &ids).unwrap();
+    println!("Done!");
 }
 
 #[derive(Debug)]
