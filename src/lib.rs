@@ -1,31 +1,36 @@
+#![feature(proc_macro, wasm_custom_section, wasm_import_module)]
+
+extern crate wasm_bindgen;
 extern crate byteorder;
 extern crate leb128;
 
-use std::{
-    env,
-    fs,
-    io::{Read, Write, Cursor, BufWriter}
-};
+use std::io::Cursor;
 use byteorder::{LE, ReadBytesExt};
+use wasm_bindgen::prelude::*;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut buffer = vec![];
+#[wasm_bindgen]
+extern {
+    fn alert(s: &str);
+}
 
-    //FIXME: bounds check
-    let mut file = fs::File::open(&args[1]).unwrap();
-    file.read_to_end(&mut buffer).unwrap();
+#[wasm_bindgen]
+pub fn do_stuff(buf: Vec<u8>) -> Vec<u32> {
+    alert("In Rust!");
+    alert(&format!("Got some bytes: {:?}", &buf[..20]));
 
-    let db = OsuDb::parse(&buffer[..]);
-    let mut writer = BufWriter::new(fs::File::create("parsed_db.txt").unwrap());
+    let db = OsuDb::parse(&buf);
+
+    alert(&db.player_name);
+    
     let ids = db.beatmaps.into_iter()
         .filter_map(|bm| match bm.beatmap_id {
             0 => None,
             _ => Some(bm.beatmap_id)
         })
         .collect::<Vec<u32>>();
-    write!(&mut writer, "{:#?}", &ids).unwrap();
-    println!("Done!");
+
+    alert(&format!("From Rust: {:?}", &ids));
+    ids
 }
 
 #[derive(Debug)]

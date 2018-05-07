@@ -3,3 +3,6 @@
 .vscode
 parsed_db.txt
 *.db
+/node_modules
+Cargo.lock
+package-lock.json
